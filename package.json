@@ -1,0 +1,37 @@
+{
+  "name": "treason",
+  "version": "0.0.0",
+  "description": "Cheating on JSX with JSON based components",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/3rd-Eden/treason.git"
+  },
+  "keywords": [
+    "json",
+    "react",
+    "components",
+    "convert",
+    "compile",
+    "treeson",
+    "treason",
+    "template"
+  ],
+  "author": "Arnout Kazemier",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/3rd-Eden/treason/issues"
+  },
+  "homepage": "https://github.com/3rd-Eden/treason#readme",
+  "devDependencies": {
+    "assume": "^2.1.0",
+    "mocha": "^5.2.0",
+    "react": "^16.6.3"
+  },
+  "dependencies": {
+    "fn.name": "^1.1.0"
+  }
+}

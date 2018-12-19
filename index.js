@@ -2,6 +2,26 @@ const displayName = require('fn.name');
 const React = require('react');
 
 /**
+ * Helper function that allows us to easily iterate over all stored modifier
+ * functions and triggering them. All modifier functions follow the same
+ * pattern where the first argument is data is getting modified and assumed
+ * to return that value after modification.
+ *
+ * @param {Array} hooks Array of callbacks that need to be iterated.
+ * @param {Mixed} returnvalue returnvalue that can be overriden.
+ * @param {Object} options Additional data/options for the modifier.
+ * @returns {Mixed} The returnvalue.
+ * @private
+ */
+function trigger(hooks = [], returnvalue, options) {
+  for (var i = 0, l = hooks.length; i < l; i++) {
+    returnvalue = hooks[i](returnvalue, options);
+  }
+
+  return returnvalue;
+}
+
+/**
  * Cheating on React with JSON instead of Component Tree's
  *
  * @class Treason
@@ -9,40 +29,53 @@ const React = require('react');
  */
 module.exports = class Treason {
   constructor() {
-    this.createElement = this.createElement.bind(this);
     this._components = new Map();
-    this._before = new Map();
-    this._after = new Map();
+
+    //
+    // Methods that need to be pre-bound
+    //
+    ['createElement', 'register'].forEach((method) => {
+      this[method] = this[method].bind(this);
+    });
+
+    //
+    // Dynamically generate these methods as they all share the same function
+    // signature that allows them to interact with the generated React elements.
+    //
+    ['before', 'after', 'modify'].forEach((method) => {
+      const storage = `_${method}`;
+
+      this[storage] = new Map();
+      this[method] = function generated(name = '', fn) {
+        const existing = this[storage].get(name);
+
+        if (existing) this[storage].set(name, [...existing, fn]);
+        else this[storage].set(name, [fn]);
+
+        return this;
+      }.bind(this);
+
+      //
+      // Restore the name to the generated prop name to make it easier to
+      // debug when errors are happening as the stacktrace shows useful names.
+      //
+      this[method].displayName = method;
+    });
   }
 
   /**
-   * Add a new middleware layer that is triggered before we transform the
-   * structures.
+   * Registers a new middleware layer.
    *
-   * @param {String} name Name of the key it needs to trigger upon.
-   * @param {Function} fn Callback that needs to trigger.
-   * @returns {Treason}
+   * @param {Function} middleware The middleware layer that needs to be called.
    * @public
    */
-  before(name, fn) {
-    this._before.set(name.toLowerCase(), fn);
-
-    return this;
-  }
-
-  /**
-   * Add a new middleware layer that is triggered after we transform the
-   * structures.
-   *
-   * @param {String} name Name of the key it needs to trigger upon.
-   * @param {Function} fn Callback that needs to trigger.
-   * @returns {Treason}
-   * @public
-   */
-  after(name, fn) {
-    this._after.set(name.toLowerCase(), fn);
-
-    return this;
+  use(middleware) {
+    middleware({
+      register: this.register,
+      modify: this.modify,
+      before: this.before,
+      after: this.after
+    });
   }
 
   /**
@@ -72,7 +105,7 @@ module.exports = class Treason {
    * @returns {Component} the createElement result.
    * @private
    */
-  createElement(name, props, kids) {
+  createElement(iterator, name, props, kids) {
     const Component = 'string' === typeof name
     ? (this._components.get(name) || name)
     : React.Fragment;
@@ -81,6 +114,8 @@ module.exports = class Treason {
       props = {};
       kids = props;
     }
+
+    props = iterator(props, Component, kids);
 
     //
     // We need to conditionally inject it children so we don't accidentally
@@ -92,7 +127,7 @@ module.exports = class Treason {
     return React.createElement(
       Component,
       props,
-      kids.map((kiddo) => this.createElement(...kiddo))
+      kids.map((kiddo) => this.createElement(iterator, ...kiddo))
     );
   }
 
@@ -106,23 +141,43 @@ module.exports = class Treason {
   transform(data) {
     const keys = Object.keys(data);
     const layout = data.layout;
+    const modify = this._modify;
     const before = this._before;
     const after = this._after;
 
     keys.forEach(function eachBefore(key) {
-      const fn = before.get(key);
-      if (!fn) return;
+      const hooks = before.get(key);
+      if (!hooks) return;
 
-      layout = fn(data[key], layout) || layout;
+      data[key] = trigger(hooks, data[key], layout);
     });
 
-    const elements = this.createElement(...layout);
+    //
+    // Iterate over each Component/prop combination so we can apply additional
+    // transformations if needed. By using `@` as a prefix for keys, it will
+    // receive the matching dataset as reference.
+    //
+    const elements = this.createElement(function iterate(props = {}, Component, children) {
+      return Object.keys(props).reduce(function eachProp(memo, prop) {
+        const special = '@' === prop.charAt(0);
+        const modifiers = modify.get(prop);
+
+        if (modifiers) memo[prop] = trigger(modifiers, props[prop], {
+          data: special ? data[prop.slice(1)] : undefined,
+          Component,
+          children,
+          props,
+        });
+
+        return memo;
+      }, props);
+    }, ...layout);
 
     keys.forEach(function eachAfter(key) {
-      const fn = after.get(key);
-      if (!fn) return;
+      const hooks = after.get(key);
+      if (!hooks) return;
 
-      elements = fn(data[key], elements) || elements;
+      elements = trigger(hooks, elements, data[key]);
     });
 
     return elements;
@@ -135,6 +190,7 @@ module.exports = class Treason {
    */
   clear() {
     this._components.clear();
+    this._modify.clear();
     this._before.clear();
     this._after.clear();
   }

@@ -4,7 +4,8 @@
   "description": "Cheating on JSX with JSON based components",
   "main": "index.js",
   "scripts": {
-    "test": "mocha test.js"
+    "test:runner": "mocha --require setup-env test.js",
+    "test": "nyc --reporter=text --reporter=lcov npm run test:runner"
   },
   "repository": {
     "type": "git",
@@ -26,12 +27,29 @@
     "url": "https://github.com/3rd-Eden/treason/issues"
   },
   "homepage": "https://github.com/3rd-Eden/treason#readme",
+  "babel": {
+    "plugins": [
+      "@babel/plugin-proposal-object-rest-spread"
+    ],
+    "presets": [
+      "@babel/preset-env",
+      "@babel/preset-react"
+    ]
+  },
   "devDependencies": {
+    "@babel/cli": "^7.2.0",
+    "@babel/core": "^7.2.2",
+    "@babel/plugin-proposal-object-rest-spread": "^7.2.0",
+    "@babel/preset-env": "^7.2.0",
+    "@babel/preset-react": "^7.0.0",
+    "@babel/register": "^7.0.0",
     "assume": "^2.1.0",
     "mocha": "^5.2.0",
-    "react": "^16.6.3"
+    "react": "^16.6.3",
+    "setup-env": "^1.2.2"
   },
   "dependencies": {
-    "fn.name": "^1.1.0"
+    "fn.name": "^1.1.0",
+    "nyc": "^13.1.0"
   }
 }

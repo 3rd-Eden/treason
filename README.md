@@ -43,7 +43,7 @@ layout.register('MyComponent', MyComponent);
 Now that we have components register a payload can be decoded so we can render
 an output.
 
-``js
+```js
 const view = layout.render(require('./you/json/payload.json'));
 console.log(view);
 ```
@@ -71,7 +71,6 @@ Now that the we've registered the elements we want to allow in our view, we can
 pass it some JSON to render.
 
 ```js
-
 const view = layout.render(require('./path/to/file.json'));
 
 <Container>
@@ -130,6 +129,39 @@ layout.register('Example', Example);
 
 The method returns it self so it can be used for chaining purposes.
 
+### use
+
+```js
+treason.use(function (api) {
+  // api.register();
+  // api.modify();
+  // api.before();
+  // api.after();
+})
+```
+
+### modify
+
+```js
+treason.modify('@style', function modify(value, config) {
+  // config.props
+  // config.Component
+  // config.children
+  // config.data
+
+  return value;
+});
+```
+
+For example to prevent the `dangerouslySetInnerHTML` from being used as
+property on any of the components, you could forcefully remove it using:
+
+```js
+treason.modify('dangerouslySetInnerHTML', function modify(value, config) {
+  return undefined;
+});
+```
+
 ### before
 
 ### after
@@ -179,16 +211,19 @@ the layout that destructured as `Array`
 Below are some examples where the different use's and their outputs are
 rendered.
 
+**INPUT:**
 ```js
 [{ foo: bar}, ["Example"]]
 ```
 
+**OUTPUT:**
 ```js
 <Fragment foo="bar">
   <Example />
 </Fragment>
 ```
 
+**INPUT:**
 ```js
 ['Svg', [
   ["Rect", { height: 100, width: 100, fillColor: "red" }],
@@ -200,6 +235,7 @@ rendered.
 ]]
 ```
 
+**OUTPUT:**
 ```js
 <Svg>
   <Rect height={ 100 } width={ 100 } fillColor="red" />

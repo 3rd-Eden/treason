@@ -3,6 +3,16 @@
 Cheating on React by using JSON. The idea is simple, instead of creating your
 layout.
 
+So how does this work, we iterate over your supplied JSON payload, look for the
+`layout` key and iterate the array, creating new elements using
+`React.createElement`. To support deeply nested structures we automatically
+generate the required `key` properties, or you supply them your self in as
+props for the components. To fully unlock all potential of this module we allow
+you modify every step of the process using various of helper methods. Want to
+use a stylesheet object instead of style props? Easy mode. Wrapping the app
+with Redux store? No problem. Custom components, React-Native? Yep, all
+supported.
+
 ## Table of Contents
 
 - [Installation](#installation)
@@ -58,9 +68,9 @@ import { Foo, Bar, Loading } from './components';
 import React, { Component } from 'react';
 import Treason from 'treason';
 
-const layout = new Treason();
+const treason = new Treason();
 
-layout
+treason
 .register('Text', Text)
 .register('View', View)
 .register('Path', Path)
@@ -71,7 +81,7 @@ Now that the we've registered the elements we want to allow in our view, we can
 pass it some JSON to render.
 
 ```js
-const view = layout.render(require('./path/to/file.json'));
+const view = treason.render(require('./path/to/file.json'));
 
 <Container>
   { view }
@@ -109,6 +119,14 @@ Now you have on the fly updating of your app's layout.
 
 ## API
 
+- [register](#register)
+- [use](#use)
+- [before](#before)
+- [after](#after)
+- [modify](#modify)
+- [render](#render)
+- [clear](#clear)
+
 ### register
 
 Registers a new custom component that can be rendered by the JSON structure. The
@@ -124,23 +142,70 @@ class Example extends React.Component {
   }
 }
 
-layout.register('Example', Example);
+treason.register('Example', Example);
 ```
 
 The method returns it self so it can be used for chaining purposes.
 
 ### use
 
+The supplied function will receive the plugin API that will give authors
+access to the following methods:
+
+- [`register`](#register)
+- [`modify`](#modify)
+- [`before`](#before)
+- [`after`](#after)
+- [`use`](#use)
+
 ```js
+treason.use(require('treason-react-native-svg'));
+treason.use(require('treason-react-native'));
+
 treason.use(function (api) {
   // api.register();
   // api.modify();
   // api.before();
   // api.after();
-})
+});
 ```
 
 ### modify
+
+The `modify` functions allows you to transform specific properties. It requires
+the following properties:
+
+- `prop` The name of the property that needs to be intercepted.
+- `callback` Function that is invoked when the given property is encountered.
+
+The `callback` receives the following arguments:
+
+- `value` The value of the property.
+- `config` An object with some additional information on where it's encountered
+  - `Component`: The component that is being rendered with the property.
+  - `props`: Reference to all props on the component.
+  - `children`: Children of the `Component`.
+  - `data`: Only set when you use the special `@` syntax.
+
+The callback should `return` the new value for the property.
+
+For example to prevent the `dangerouslySetInnerHTML` from being used as
+property on any of the components, you could forcefully remove it by modifying
+the value from the HTML payload to `undefined`:
+
+```js
+treason.modify('dangerouslySetInnerHTML', function modify(value, config) {
+  return undefined;
+});
+```
+
+The `modify` function allows you to reference the additional data structures
+that you've send together with your `layout` payload. You can reference this
+data by prefixing the name of the properties with an `@`.
+
+Because these properties are references data structures that were received in
+the JSON structure they will be removed automatically after they have been
+encountered in the `props` of the component.
 
 ```js
 treason.modify('@style', function modify(value, config) {
@@ -149,33 +214,139 @@ treason.modify('@style', function modify(value, config) {
   // config.children
   // config.data
 
-  return value;
+  config.props.style = config.style[value];
+});
+
+treason.render({
+  style: { /* this will be set as config.data in the function above */ },
+  layout: ['div' { '@style': 'hello' }, [
+    ['div', { '@style': 'hello' }]
+  ]]
 });
 ```
 
-For example to prevent the `dangerouslySetInnerHTML` from being used as
-property on any of the components, you could forcefully remove it using:
+In the example above, the `@style` modifier will be called for the `div`, and
+receive `hello` as value. The `config.data` is propagated with the contents of
+the `style` property of the JSON payload that you supplied to `treason.render`.
+
+So in this example we're re-using a single `style` object instead of having to
+supply the same style information multiple times in the JSON structure. Allowing
+you to create a smaller and more efficient payload.
+
+But we can do better, you can combine this with the [`before`](#before) method
+that will pre-process the referenced `style` object. So if you where to do this
+on React-Native, you could transform the `style` into a `StyleSheet` instance:
 
 ```js
-treason.modify('dangerouslySetInnerHTML', function modify(value, config) {
-  return undefined;
+import { StyleSheet } from 'react-native';
+
+treason.before('style', function (payload) {
+  return StyleSheet.create(payload);
 });
 ```
 
 ### before
 
+Pre-process the data in the JSON.
+
+```js
+treason.before('style', function before(style, layout) {
+
+});
+```
+
 ### after
+
+Allows you to apply any additional post processing after the layout has been
+transformed into React elements. The method requires 2 arguments:
+
+- `name` The name of the property in the initial JSON payload.
+- `callback` Function that is invoked when the given property is encountered.
+
+The `callback` receives the following arguments:
+
+- `elements` The rendered React Elements tree.
+- `data` Data that the `name` referenced in the JSON payload.
+
+The callback should `return` the React Elements tree, or a new modified tree:
+
+```js
+treason.after('messages', function after(elements, messages) {
+  return (
+    <IntlProvider locale={ navigator.language } messages={ messages }>
+      { elements }
+    </IntlProvider>
+  );
+});
+
+treason.render({ messages: {}, layout: ['Foo'] });
+```
+
+In the example above we have our React Intl messages stored as `messages` key
+in the initial payload, so after the elements are transformed we wrap the
+generated React Tree and pass it the initial messages payload.
 
 ### render
 
 This method transforms your given JSON string, or object structure into the
-actual React elements. It accepts a single argument:
+actual React elements. It accepts a single argument, the JSON string, or object
+that needs to be transformed into React Elements. It should have a `layout` key
+that follows our [JSON](#JSON) structure specification. Additional keys may be
+supplied as their content can be referenced using the `before`, `after` and
+`modify` functions.
 
-- `data` The JSON string, or object that needs to be transformed into React
-  Elements.
+It's a **synchronous** process so the method will return created elements:
 
 ```js
-layout.render(['ComponentName', { props: 'here' }]);
+const elements = layout.render({
+  layout: ['ComponentName', { props: 'here' }]
+});
+```
+
+As it's returning React Element's it can be used inside components as well.
+
+```js
+class Ads extends React.Component {
+  constructor() {
+    super(...arguments);
+
+    this.state = {
+      view: null
+    };
+  }
+
+  componentDidMount() {
+    fetch('https://my.ads.server/treason').then(function parse(response) {
+      return response.json();
+    })
+    .then(function update(myJson) {
+      this.setState({ view: treason.render(myJson) });
+    });
+  }
+
+  render() {
+    if (!this.state.view) return <div className="placeholder" />
+
+    return (
+      <div className="ads">
+        { this.state.view }
+      </div>
+    )
+  }
+}
+```
+
+**Word of caution** Your JSON, your problem, we do not sanitize your data. Any
+of the registered components as well as normal elements can be rendered through
+the payload so **do not allow user input as JSON/layout values**.
+
+### clear
+
+Clear the instance of all of it's registered components and before, after,
+use, modify functions.
+
+```js
+treason.clear();
 ```
 
 ## JSON
@@ -249,3 +420,10 @@ rendered.
 
 You can go as deep as you want with the structures, supply as many props as
 want.
+
+## License
+
+[MIT](LICENSE)
+
+[AssetSystem]: https://github.com/godaddy/asset-system/blob/master/SPECIFICATION.md
+[reacts]: https://github.com/bigpipe/reacts

@@ -13,7 +13,7 @@ const React = require('react');
  * @returns {Mixed} The returnValue.
  * @private
  */
-function trigger(hooks = [], returnValue, options) {
+function trigger(hooks, returnValue, options) {
   for (var i = 0, l = hooks.length; i < l; i++) {
     returnValue = hooks[i](returnValue, options);
   }
@@ -162,7 +162,7 @@ module.exports = class Treason {
    * Transforms a given JSON structure into it's React Component Tree equiv.
    *
    * @param {Object} data The data structure that needs to be transformed.
-   * @returns {Component} The transformed React tree.
+   * @returns {Component|Undefined} The transformed React tree.
    * @private
    */
   transform(data) {
@@ -171,6 +171,14 @@ module.exports = class Treason {
     const modify = this._modify;
     const before = this._before;
     const after = this._after;
+
+    //
+    // Layout is missing, so there is nothing to iterate here, doesn't even make
+    // sense to execute any of the before/after hooks as they assume the
+    // existance of the layout in their arguments. If you reach this statement
+    // you basically fucked up, hard.
+    //
+    if (!layout) return;
 
     keys.forEach(function eachBefore(key) {
       const hooks = before.get(key);

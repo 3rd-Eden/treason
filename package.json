@@ -1,10 +1,15 @@
 {
   "name": "treason",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Cheating on JSX with JSON based components",
-  "main": "index.js",
+  "main": "./lib",
+  "browser": "./lib",
+  "module": "./index",
+  "react-native": "./index",
   "scripts": {
     "test:runner": "mocha --require setup-env test.js",
+    "build": "babel ./index.js ./react-native.js ./svgs.js -d lib",
+    "prepublishOnly": "npm run build",
     "test": "nyc --reporter=text --reporter=lcov npm run test:runner"
   },
   "repository": {
@@ -49,11 +54,13 @@
     "jsdom": "^13.1.0",
     "mocha": "^5.2.0",
     "react": "^16.6.3",
-    "setup-env": "^1.2.2"
+    "react-dom": "^16.7.0",
+    "react-native": "^0.57.8",
+    "setup-env": "^1.2.2",
+    "svgs": "^4.0.0"
   },
   "dependencies": {
     "fn.name": "^1.1.0",
-    "nyc": "^13.1.0",
-    "svgs": "^4.0.0"
+    "nyc": "^13.1.0"
   }
 }

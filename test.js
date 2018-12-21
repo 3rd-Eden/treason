@@ -1,8 +1,8 @@
 const { it, describe, beforeEach, afterEach } = require('mocha');
-const { shallow } = require('enzyme');
+const { render, shallow } = require('enzyme');
+const Treason = require('./index');
 const assume = require('assume');
 const React = require('react');
-const Treason = require('./');
 
 describe('Treason', function () {
   let treason;
@@ -145,33 +145,35 @@ describe('Treason', function () {
     });
 
     it('returns React.createElement(Fragment) for { layout: [] }', function () {
-      const res = shallow(treason.render({
+      const res = treason.render({
         layout: []
-      }));
+      });
 
-      assume(res.equals(<React.Fragment />)).is.true();
+      assume(res.type).is.a('symbol');
+      assume(res.type).deep.equals((<React.Fragment />).type);
     });
 
     it ('parses stringified JSON', function () {
       const res = treason.render('{"layout":[]}');
 
-      assume(res).deep.equals(<React.Fragment />);
+      assume(res.type).deep.equals((<React.Fragment />).type);
     });
 
     it('renders a component with props', function () {
-      const res = treason.render({
+      const enzyme = shallow(treason.render({
         layout: [ 'Foo', { foo: 'bar' } ]
-      });
+      }));
 
-      assume(res).deep.equals(<Foo foo='bar' />)
+      assume(enzyme.instance().props).deep.equals({ foo: 'bar' });
+      assume(enzyme.instance()).is.instanceOf(Foo);
     });
 
     it('can render text (string based children)', function () {
-      const res = treason.render({
+      const enzyme = shallow(treason.render({
         layout: ['p', 'hello']
-      });
+      }));
 
-      assume(res).deep.equals(<p>hello</p>);
+      assume(enzyme.equals(<p>hello</p>)).is.true();
     });
 
     it('allows modification of normal props', function () {
@@ -188,11 +190,13 @@ describe('Treason', function () {
         return 'yeah-this-is-now-modified';
       });
 
-      const res = treason.render({
+      const enzyme = shallow(treason.render({
         layout: ['Foo', { className: 'hello' }]
-      });
+      }));
 
-      assume(res).deep.equals(<Foo className='yeah-this-is-now-modified' />);
+      assume(enzyme.html()).equals(shallow(
+        <Foo className='yeah-this-is-now-modified' />
+      ).html());
     });
 
     it('special @prefixed props receive matching data source', function () {
@@ -216,12 +220,14 @@ describe('Treason', function () {
         return undefined;
       });
 
-      const res = treason.render({
+      const enzyme = shallow(treason.render({
         stylesheet: 'this should be processed by before',
         layout: ['Foo', { '@stylesheet': 'foo' }]
-      });
+      }));
 
-      assume(res).deep.equals(<Foo className='this-will-be-injected' />);
+      assume(enzyme.html()).equals(shallow(
+        <Foo className='this-will-be-injected' />
+      ).html());
     });
 
     it('can modify end result using the `after` method', function () {
@@ -233,22 +239,22 @@ describe('Treason', function () {
         );
       });
 
-      const res = treason.render({
+      const enzyme = shallow(treason.render({
         layout: ['p', 'i hope this is wrapped']
-      });
+      }));
 
-      assume(res).deep.equals(
+      assume(enzyme.html()).equals(shallow(
         <div className='wrapper'>
           <p>i hope this is wrapped</p>
         </div>
-      );
+      ).html());
     });
 
     it('can render complex deeply nested structures', function () {
       treason.register('Foo', Foo);
       treason.register('Bar', Bar);
 
-      const res = treason.render({
+      const enzyme = shallow(treason.render({
         layout: ['div', { className: 'container' }, [
           ['Foo'],
           ['Bar', [
@@ -256,9 +262,9 @@ describe('Treason', function () {
             ['p', { id: 'custom-id' }, 'world']
           ]]
         ]]
-      });
+      }));
 
-      assume(res).deep.equals(
+      assume(enzyme.html()).equals(shallow(
         <div className='container'>
           <Foo />
           <Bar>
@@ -266,7 +272,30 @@ describe('Treason', function () {
             <p id='custom-id'>world</p>
           </Bar>
         </div>
-      );
+      ).html());
+
+      assume(enzyme.find(Foo).key()).is.a('string');
+      assume(enzyme.find(Foo).key()).includes('/treason');
+      assume(enzyme.find(Bar).key()).is.a('string');
+      assume(enzyme.find(Bar).key()).includes('/treason');
+    });
+
+    it('uses the supplied key prop instead of a custom generated', function () {
+      treason.register('Foo', Foo);
+      treason.register('Bar', Bar);
+
+      const enzyme = shallow(treason.render({
+        layout: ['div', { className: 'container' }, [
+          ['Foo', { key: 'whats-up' }],
+          ['Bar', { key: 'up-whats' }, [
+            ['p', 'hello'],
+            ['p', { id: 'custom-id' }, 'world']
+          ]]
+        ]]
+      }));
+
+      assume(enzyme.find(Foo).key()).equals('whats-up');
+      assume(enzyme.find(Bar).key()).equals('up-whats');
     });
 
     it('triggers the before function `custom` with the payload', function (next) {
@@ -282,6 +311,36 @@ describe('Treason', function () {
         layout: [ 'Foo', { foo: 'bar' } ]
       });
     });
+
+    it('returns nothing when `layout` is missing', function () {
+      const res = treason.render({});
+
+      assume(res).is.a('undefined');
+    });
+
+    it('uses a custom `layout` key', function () {
+      const custom = new Treason('custom');
+      const enzyme = shallow(custom.render({
+        custom: ['p', 'hello world']
+      }));
+
+      assume(enzyme.html()).equals(shallow(<p>hello world</p>).html());
+    });
+
+    it('does not die on `undefined` children', function () {
+      const enzyme = shallow(treason.render({
+        layout: ['div', { className: 'foo' }, [
+          undefined,
+          ['div']
+        ]]
+      }));
+
+      assume(enzyme.html()).equals(shallow(
+        <div className='foo'>
+          <div />
+        </div>
+      ).html());
+    })
 
     it('triggers the before `layout` function', function (next) {
       treason.before('layout', function transform(data, layout) {

@@ -4,6 +4,7 @@ const ReactNative = require('react-native');
  * Plugin for React-Native, registers all possible components with the
  * treason instance.
  *
+ * @see node_modules/react-native/Libraries/react-native/react-native-implementation.js
  * @param {Object} treason Plugin API interface.
  * @public
  */
@@ -11,6 +12,7 @@ module.exports = function plugin(treason) {
   [
     'ActivityIndicator',
     'Button',
+    'CheckBox',
     'DatePickerIOS',
     'DrawerLayoutAndroid',
     'FlatList',
@@ -34,12 +36,15 @@ module.exports = function plugin(treason) {
     'Slider',
     'SnapshotViewIOS',
     'StatusBar',
+    'SwipeableFlatList',
+    'SwipeableListView',
     'Switch',
     'TabBarIOS',
     'TabBarIOS.Item',
     'Text',
     'TextInput',
     'ToolbarAndroid',
+    'Touchable',
     'TouchableHighlight',
     'TouchableNativeFeedback',
     'TouchableOpacity',

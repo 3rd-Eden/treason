@@ -32,6 +32,6 @@ module.exports = function plugin(treason) {
     'TextPath',
     'Use'
   ].forEach(function register(name) {
-    treason.register(name, ReactNative[name]);
+    treason.register(name, svgs[name]);
   });
 };

@@ -1,7 +1,8 @@
 # Treason
 
-Cheating on React by using JSON. The idea is simple, instead of creating your
-layout.
+Treason, that's how it feels when you cheat on React by using JSON instead of
+JSX. This allows you to easily an API, or external source to generate your
+views. Possibilities are endless.
 
 So how does this work, we iterate over your supplied JSON payload, look for the
 `layout` key and iterate the array, creating new elements using
@@ -13,15 +14,20 @@ use a stylesheet object instead of style props? Easy mode. Wrapping the app
 with Redux store? No problem. Custom components, React-Native? Yep, all
 supported.
 
+Take a look at our [examples](/examples) folder for some usage patterns.
+
 ## Table of Contents
 
 - [Installation](#installation)
 - [Usage](#usage)
 - [API](#api)
   - [register](#register)
+  - [use](#use)
   - [before](#before)
   - [after](#after)
+  - [modify](#modify)
   - [render](#render)
+  - [clear](#clear)
 - [JSON](#json)
 
 ## Installation
@@ -42,6 +48,11 @@ import Treason from 'treason';
 
 const layout = new Treason();
 ```
+
+The `treason` instance allows a single optional argument:
+
+- `layout` The property that of the supplied JSON that stores the layout
+  structure according to our [JSON](#JSON) specification. Defaults to `layout`.
 
 Now that the Treason instance is created you can register the components that
 should be allowed to render.
@@ -159,8 +170,7 @@ access to the following methods:
 - [`use`](#use)
 
 ```js
-treason.use(require('treason-react-native-svg'));
-treason.use(require('treason-react-native'));
+treason.use(require('./your-custom-plugin-here'));
 
 treason.use(function (api) {
   // api.register();
@@ -168,6 +178,18 @@ treason.use(function (api) {
   // api.before();
   // api.after();
 });
+```
+
+The `treason` library ships with the following plugins by default:
+
+- `treason/svgs` The `svgs` library allows you to create Svgs that work in React
+  and React-Native. This plugin will register all components so they can be used
+  by the layout.
+- `treason/react-native` Registers all available components that are exposed by
+  the `react-native` library.
+
+```js
+treason.use(require('treason/svgs'));
 ```
 
 ### modify
@@ -249,9 +271,41 @@ treason.before('style', function (payload) {
 
 Pre-process the data in the JSON.
 
-```js
-treason.before('style', function before(style, layout) {
+- `name` The name of the property in the initial JSON payload.
+- `callback` Function that is invoked when the given property is encountered.
 
+The `callback` receives the following arguments:
+
+- `data` Data that the `name` referenced in the JSON payload.
+- `layout` The layout structure **before** they are transformed into React
+  elements.
+
+The callback should `return` the payload that you received as first argument.
+Anything that you return will be now used as value.
+
+```js
+import { createStore } from 'redux';
+import reducer from './reducer';
+
+treason.before('store', function before(data, layout) {
+  const store = createStore(reducer, data);
+
+  return store;
+});
+```
+
+**PRO TIP:** As the layout is stored with a `layout` key, you also modify that
+when it's received:
+
+```js
+treason.before('layout', function before(data, layout) {
+  //
+  // data == layout, as we're pre-processing the `layout` key from the
+  // supplied JSON payload. But we can now modify the whole JSON structure,
+  // add, remove elements as you wish. So in this case, we're going to
+  // wrap the received elements in a `<div class="container">` element.
+  //
+  return ['div', { className: 'container' }, layout];
 });
 ```
 
@@ -285,6 +339,9 @@ treason.render({ messages: {}, layout: ['Foo'] });
 In the example above we have our React Intl messages stored as `messages` key
 in the initial payload, so after the elements are transformed we wrap the
 generated React Tree and pass it the initial messages payload.
+
+**PRO TIP:*** Just like the `before` method, you can also process the `layout`
+key and apply additional transformation to the elements tree.
 
 ### render
 
@@ -379,8 +436,8 @@ the layout that destructured as `Array`
    component. This array should have children that are specified in exactly the
    same way as the parent component.
 
-Below are some examples where the different use's and their outputs are
-rendered.
+If you are familiar with [AssetSystem], it uses the same structure. Below are
+some examples where the different use's and their outputs are rendered.
 
 **INPUT:**
 ```js
@@ -426,4 +483,3 @@ want.
 [MIT](LICENSE)
 
 [AssetSystem]: https://github.com/godaddy/asset-system/blob/master/SPECIFICATION.md
-[reacts]: https://github.com/bigpipe/reacts
